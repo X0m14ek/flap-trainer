@@ -1,4 +1,4 @@
-import { BIRD_COLLIDERS, COMMON_RULES, CONFIG, createGame, stepGame } from './shared/physics.mjs';
+import { BIRD_COLLIDERS, COMMON_RULES, CONFIG, createGame, FLIGHT_SECTIONS, stepGame, STRICT_RULES } from './shared/physics.mjs';
 import { eventTime, FlapQueue } from './game-input.mjs';
 import { GameRenderer } from './game-renderer.mjs';
 
@@ -20,7 +20,10 @@ const hitboxHeight = id => {
 };
 const roster = Object.keys(BIRD_COLLIDERS).sort((a, b) => hitboxHeight(a) - hitboxHeight(b));
 let selected = Math.max(0, roster.indexOf(store.get('character', 'gensyxa')));
-let rules = store.get('rules', CONFIG.VERSION);
+const CONTOUR_TOP = Math.min(...FLIGHT_SECTIONS.map(([y]) => y)), CONTOUR_BOTTOM = Math.max(...FLIGHT_SECTIONS.map(([y]) => y));
+const RULES = { 'rules-23': CONFIG.VERSION, 'rules-24': COMMON_RULES, 'rules-strict': STRICT_RULES };
+let rules = store.get('rules2', STRICT_RULES);
+if (!Object.values(RULES).includes(rules)) rules = STRICT_RULES;
 renderer.showSprite = store.get('sprite', false);
 let screen = 'menu';
 let run = null;
@@ -34,10 +37,14 @@ function setText(id, text) {
 function updateMenu() {
   const id = roster[selected];
   setText('character-name', id);
-  setText('character-hitbox', `хитбокс ${hitboxHeight(id)} px`);
+  const c = BIRD_COLLIDERS[id];
+  const circleTop = Math.min(...c.map(([, y, r]) => y - r)), circleBottom = Math.max(...c.map(([, y, r]) => y + r));
+  const height = rules === CONFIG.VERSION ? circleBottom - circleTop
+    : rules === COMMON_RULES ? CONTOUR_BOTTOM - CONTOUR_TOP
+    : Math.max(circleBottom, CONTOUR_BOTTOM) - Math.min(circleTop, CONTOUR_TOP);
+  setText('character-hitbox', `хитбокс ${Math.round(height)} px`);
   setText('best-score', store.get('best:' + id, 0));
-  byId('rules-23').setAttribute('aria-pressed', String(rules === CONFIG.VERSION));
-  byId('rules-24').setAttribute('aria-pressed', String(rules === COMMON_RULES));
+  for (const [id, value] of Object.entries(RULES)) byId(id).setAttribute('aria-pressed', String(rules === value));
   byId('sprite-toggle').checked = renderer.showSprite;
 }
 
@@ -202,9 +209,9 @@ function handleAction(event) {
     store.set('character', roster[selected]);
     telegram?.HapticFeedback?.selectionChanged?.();
     updateMenu();
-  } else if (action === 'rules-23' || action === 'rules-24') {
-    rules = action === 'rules-24' ? COMMON_RULES : CONFIG.VERSION;
-    store.set('rules', rules);
+  } else if (action in RULES) {
+    rules = RULES[action];
+    store.set('rules2', rules);
     updateMenu();
   } else if (action === 'play' || action === 'again') beginGame();
   else if (action === 'menu') goBack();

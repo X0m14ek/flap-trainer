@@ -1,4 +1,4 @@
-import { birdScaleAt, collidersFor, COLUMN_TIP, COMMON_RULES, CONFIG, FLIGHT_SECTIONS, PICKUP, projectFlight, STATUE } from './shared/physics.mjs';
+import { birdScaleAt, collidersFor, COLUMN_TIP, COMMON_RULES, CONFIG, FLIGHT_SECTIONS, PICKUP, projectFlight, STATUE, STRICT_RULES } from './shared/physics.mjs';
 
 const COLORS = {
   stone: '#4b4163', stoneLight: '#6c5d8c', stoneDark: '#2a2238',
@@ -65,13 +65,14 @@ export class GameRenderer {
     ctx.rotate(bird.rotation);
     ctx.scale(scale, scale);
     ctx.fillStyle = dead ? COLORS.dead : COLORS.bird;
-    if (version === COMMON_RULES) {
+    if (version === COMMON_RULES || version === STRICT_RULES) {
       ctx.beginPath();
       FLIGHT_SECTIONS.forEach(([y, left], i) => i ? ctx.lineTo(left, y) : ctx.moveTo(left, y));
       for (let i = FLIGHT_SECTIONS.length - 1; i >= 0; i--) ctx.lineTo(FLIGHT_SECTIONS[i][2], FLIGHT_SECTIONS[i][0]);
       ctx.closePath();
       ctx.fill();
-    } else {
+    }
+    if (version !== COMMON_RULES) {
       const circles = collidersFor(bird.streamerId);
       for (const [cx, cy, r] of circles) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); }
       ctx.strokeStyle = COLORS.birdLine;
