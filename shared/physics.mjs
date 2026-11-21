@@ -1,6 +1,8 @@
 // Deterministic 60 Hz simulation. Same rules, constants, hitboxes and column generation as the original game.
 // No clock, rendering, network or random globals.
 export const COMMON_RULES = 24;
+// Trainer-only: a hit by EITHER the v23 circles or the v24 contour ends the run (strictest of both).
+export const STRICT_RULES = 99;
 
 const FIELD_TOP = 52;
 const FIELD_BOTTOM = 917;
@@ -166,7 +168,7 @@ function addObstacle(state, xFixed) {
 }
 
 export function createGame(seed, streamerId = 'gensyxa', version = CONFIG.VERSION) {
-  if (version !== CONFIG.VERSION && version !== COMMON_RULES) throw new RangeError('Unsupported rules');
+  if (![CONFIG.VERSION, COMMON_RULES, STRICT_RULES].includes(version)) throw new RangeError('Unsupported rules');
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError('Seed must be a uint32');
   const effectSeed = { rngState: (seed ^ 0x9e3779b9) >>> 0 || 1 };
   const state = {
@@ -359,12 +361,16 @@ export function stepGame(state, flap = false) {
   }
   state.tick++;
 
-  if (state.version === COMMON_RULES) {
-    const contact = commonCollision(bird, birdScaleAt(state), state.obstacles);
-    if (contact) endGame(state, contact);
-  } else if (bird.y - bird.radius * birdScale <= CONFIG.FIELD_TOP) endGame(state, 'ceiling');
-  else if (bird.y + bird.radius * birdScale >= CONFIG.FIELD_BOTTOM) endGame(state, 'floor');
-  else if (state.obstacles.some(obstacle => touchesObstacle(bird, obstacle, birdScale))) endGame(state, 'collision');
+  let contact = null;
+  if (state.version === COMMON_RULES || state.version === STRICT_RULES) {
+    contact = commonCollision(bird, birdScaleAt(state), state.obstacles);
+  }
+  if (!contact && state.version !== COMMON_RULES) {
+    if (bird.y - bird.radius * birdScale <= CONFIG.FIELD_TOP) contact = 'ceiling';
+    else if (bird.y + bird.radius * birdScale >= CONFIG.FIELD_BOTTOM) contact = 'floor';
+    else if (state.obstacles.some(obstacle => touchesObstacle(bird, obstacle, birdScale))) contact = 'collision';
+  }
+  if (contact) endGame(state, contact);
 
   if (state.alive) {
     for (const obstacle of state.obstacles) {
